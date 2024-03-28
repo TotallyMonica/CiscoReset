@@ -172,8 +172,7 @@ def router_defaults(serial_info):
     print("Sending ^C until we enter ROMMON")
     output = b''
     while not output.decode().lower().startswith("rommon"):
-        for i in range(10):
-            ser.write(b"\x03")
+        ser.write(b"\x03")
         output = ser.readline()
         print(output)
 
@@ -191,8 +190,6 @@ def router_defaults(serial_info):
 
 def log_inputs(serial_info):
     inputs = []
-    # ser = serial.Serial(serial_info)
-    # ser.timeout = 15
 
     print("Trigger password recovery by following these steps: ")
     print("1. Turn off the router")
@@ -203,12 +200,11 @@ def log_inputs(serial_info):
     ser = serial.Serial(serial_info)
     ser.timeout = 10
 
-    # output = b''
-    # while not output.decode().lower().startswith("rommon"):
-    #     for i in range(1):
-    #         ser.write(b"\x03")
-    #     output = ser.readline()
-    #     print(output)
+    output = b''
+    while not output.decode().lower().startswith("rommon"):
+        ser.write(b"\x03")
+        output = ser.readline()
+        print(output)
 
     consecutive_blank_line_count = 0
     blank_line_threshold = 10
@@ -218,12 +214,12 @@ def log_inputs(serial_info):
         print(f"{line}")
         if line == b'':
             consecutive_blank_line_count += 1
-            ser.write(b'\n')
+            ser.write(b'\r\n')      # Seems to be when we're in the regular boot mode, we need to write b'\r\n at the end of the line'
             print(f"{consecutive_blank_line_count=}")
         else:
             consecutive_blank_line_count = 0
-        # if line.startswith(b'Image validated'):
-        #     blank_line_threshold = 15
+        if line.startswith(b'Image validated'):
+            blank_line_threshold = 15
         if 'rommon' in line.decode().lower() or 'router' in line.decode().lower() or consecutive_blank_line_count >= blank_line_threshold:
             user_input = input('> ') + '\n'
             consecutive_blank_line_count = 0
