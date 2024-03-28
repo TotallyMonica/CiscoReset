@@ -58,12 +58,19 @@ def switch_reset_password_enabled(ser: serial.Serial):
     ser.timeout = original_timeout
 
 def setup_serial():
-    ports = [port for port in serial.tools.list_ports.comports()]
+    is_valid = False
+    while not is_valid:
+        ports = [port for port in serial.tools.list_ports.comports()]
 
-    print("Select your serial device:")
-    for port in ports:
-        print(f"{port.device}:\n\tManufacturer: {port.manufacturer}\n\tDescription: {port.description}\n\tHardware ID: {port.hwid}")
-    dev = input()
+        print("Select your serial device:")
+        for port in ports:
+            print(f"{port.device}:\n\tManufacturer: {port.manufacturer}\n\tDescription: {port.description}\n\tHardware ID: {port.hwid}")
+        dev = input()
+    try:
+        with serial.Serial(dev) as tmp:
+            is_valid = True
+    except PermissionError:
+        print("Unknown device or device already open. Please try a different device.")
 
     return dev
 
@@ -78,12 +85,13 @@ def switch_defaults(serial_info: str, debug: bool = False):
              "Plug the switch in while holding the button",
              "When you are told, release the MODE button"]
 
+    ser = serial.Serial(serial_info)
+    ser.timeout = 15
+
     print("Trigger password recovery by following these steps: ")
     for i in range(len(STEPS)):
         print(f"{i+1}. {STEPS[i]}")
 
-    ser = serial.Serial(serial_info)
-    ser.timeout = 15
 
     output = ser.readline()
     while b'\rXmodem file system is available.\n' not in output:
@@ -170,15 +178,16 @@ def router_defaults(serial_info, debug: bool = False):
     NORMAL_REGISTER = "0x2102"
     SAVE_PROMPT = "[yes/no]: "
 
+    # In the startup sequence, we don't need to wait for an extremely long time
+    ser = serial.Serial(serial_info)
+    ser.timeout = 1
+
     print("Trigger password recovery by following these steps: ")
     print("1. Turn off the router")
     print("2. After waiting for the lights to shut off, turn the router back on")
     print("3. Press enter here once this has been completed")
     input()
 
-    # In the startup sequence, we don't need to wait for an extremely long time
-    ser = serial.Serial(serial_info)
-    ser.timeout = 1
 
     if debug:
         print('='*30)
@@ -242,7 +251,7 @@ def router_defaults(serial_info, debug: bool = False):
     if debug:
         print('='*30)
     ser.timeout = 1
-    commands = ['enable', 'conf t', f'conf-register {NORMAL_REGISTER}', 'end']
+    commands = ['enable', 'conf t', f'config-register {NORMAL_REGISTER}', 'end']
     for cmd in commands:
         ser.write(format_command(cmd))
         output = ser.readline()
@@ -343,11 +352,14 @@ def log_inputs(serial_info):
             read_line = ser.readline()
             print(f"{read_line}", end='')
 
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
+def main(args: list = sys.argv):
     settings = setup_serial()
     print(router_defaults(settings, debug=True))
-    # print(switch_defaults(settings))
+    print(switch_defaults(settings))
+
+# Press the green button in the gutter to run the script.
+if __name__ == '__main__':
+
     # print(json.dumps(log_inputs(settings)))
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
