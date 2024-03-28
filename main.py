@@ -66,11 +66,11 @@ def setup_serial():
         for port in ports:
             print(f"{port.device}:\n\tManufacturer: {port.manufacturer}\n\tDescription: {port.description}\n\tHardware ID: {port.hwid}")
         dev = input()
-    try:
-        with serial.Serial(dev) as tmp:
-            is_valid = True
-    except PermissionError:
-        print("Unknown device or device already open. Please try a different device.")
+        try:
+            with serial.Serial(dev) as tmp:
+                is_valid = True
+        except PermissionError:
+            print("Unknown device or device already open. Please try a different device.")
 
     return dev
 
@@ -359,7 +359,7 @@ def main(args: list = sys.argv):
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-
+    main(sys.argv)
     # print(json.dumps(log_inputs(settings)))
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
