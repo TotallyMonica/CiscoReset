@@ -6,6 +6,18 @@ import serial.tools.list_ports
 def format_command(cmd: str = '') -> bytes:
     return f"{cmd}\n".encode('utf-8')
 
+def wait_until_prompt(dev: serial.Serial, prompt: str, debug: bool = False) -> bytes:
+    output = dev.readline()
+    if debug:
+        while not output.decode().lower().strip().startswith(prompt.lower().strip()):
+            print(f"DEBUG: {output}")
+            output = dev.readline()
+    else:
+        while not output.decode().lower().strip().startswith(prompt.lower().strip()):
+            output = dev.readline()
+
+    return output
+
 def dedup(original_list):
     deduped_list = []
     for val in original_list:
@@ -195,11 +207,11 @@ def router_defaults(serial_info, debug: bool = False):
     if debug:
         print('='*30)
     output = b''
-    while not output.decode().lower().startswith(ROMMON_PROMPT):
-        ser.write(b"\x03")
-        output = ser.readline()
-        if debug:
-            print(f"DEBUG: {output}")
+    wait_until_prompt(ser, ROMMON_PROMPT, debug)
+    ser.write(b"\x03")
+    output = ser.readline()
+    if debug:
+        print(f"DEBUG: {output}")
 
     if debug:
         print('='*30)
@@ -218,10 +230,8 @@ def router_defaults(serial_info, debug: bool = False):
             print(f"DEBUG: {output}")
         iter += 1
         # Sometimes it will print out some flavor text, we just wanna ignore that until we get to the prompt again
-        while not output.decode().lower().startswith(f"{ROMMON_PROMPT} {iter}") and not cmd == commands[-1]:
-            output = ser.readline()
-            if debug:
-                print(f"DEBUG: {output}")
+        if not cmd == commands[-1]:
+            wait_until_prompt(ser, f"{ROMMON_PROMPT} {iter}", debug)
     while output.decode().lower().startswith("rommon"):
         ser.write(format_command())
         if debug:
@@ -274,13 +284,12 @@ def router_defaults(serial_info, debug: bool = False):
         print('='*30)
     ser.write(format_command('erase nvram:'))
     output = ser.readline()
-    while not output.decode().lower().endswith(CONFIRMATION_PROMPT):
-        if debug:
-            print(f"DEBUG: {output}")
-        output = ser.readline()
     if debug:
         print(f"DEBUG: {output}")
-    ser.write(format_command("confirm"))
+    output = ser.readline()
+    if debug:
+        print(f"DEBUG: {output}")
+    ser.write(format_command())
     output = ser.readline()
     if debug:
         print(f"DEBUG: {output}")
