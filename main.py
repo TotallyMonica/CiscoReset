@@ -3,6 +3,9 @@ import sys
 import serial
 import serial.tools.list_ports
 
+def format_command(cmd: str = '') -> bytes:
+    return f"{cmd}\n".encode('utf-8')
+
 def dedup(original_list):
     deduped_list = []
     for val in original_list:
@@ -28,14 +31,14 @@ def parse_files_to_delete(output: list[str], debug: bool = True):
 def switch_reset_password_enabled(ser: serial.Serial):
     files_without_extensions = ["private-config", "config", "vlan"]
     original_timeout = ser.timeout
-    ser.write(b"flash_init\n")
+    ser.write(format_command("flash_init"))
     print("Initializing flash...")
     ser.timeout = 10
     output = b''
     while b'switch:' not in output:
         print(output)
         output = ser.readline()
-    ser.write(b"dir flash:\n")
+    ser.write(format_command("dir flash:"))
     print("Getting directory listing...")
     listing = ser.readlines()
     for line in listing:
@@ -43,13 +46,13 @@ def switch_reset_password_enabled(ser: serial.Serial):
         for file in files_without_extensions:
             if file in decoded_line:
                 parsed_line = decoded_line.split(' ')[-1]
-                ser.write(f"del flash:{parsed_line}\n".encode())
+                ser.write(format_command(f"del flash:{parsed_line}"))
                 output = ser.readline()
                 print(output)
                 while b'\rAre you sure you want to delete "flash:' not in output:
                     output = ser.readline()
                     print(output)
-                ser.write(b'y\n')
+                ser.write(format_command('y'))
         print(line)
 
     ser.timeout = original_timeout
@@ -99,7 +102,7 @@ def switch_defaults(serial_info: str, debug: bool = True):
     if debug:
         print(f"DEBUG: {output}")
     print("Entered recovery console, initializing flash.")
-    ser.write('flash_init\n'.encode('utf-8'))
+    ser.write(format_command('flash_init\n'))
     output = ser.readline()
     while RECOVERY_PROMPT not in output:
         if debug:
@@ -108,7 +111,7 @@ def switch_defaults(serial_info: str, debug: bool = True):
     if debug:
         print(f"DEBUG: {output}")
     print("Flash has been initialized, now listing directory")
-    ser.write('dir flash:\n'.encode('utf-8'))
+    ser.write(format_command('dir flash:\n'))
     output = ser.readline()
     if debug:
         print(f"DEBUG: {output}")
@@ -120,7 +123,7 @@ def switch_defaults(serial_info: str, debug: bool = True):
     print("Deleting files")
     for file in files_to_delete:
         print(f"Deleting {file}")
-        ser.write(f'del flash:{file}\n'.encode('utf-8'))
+        ser.write(format_command(f'del flash:{file}'))
         output = ser.readline()
         while CONFIRMATION_PROMPT not in output:
             if debug:
@@ -129,7 +132,7 @@ def switch_defaults(serial_info: str, debug: bool = True):
         if debug:
             print(f"DEBUG: {output}")
             print(f"Confirming deletion")
-        ser.write(b'y\n')
+        ser.write(format_command('y'))
         output = ser.readline()
         if debug:
             print(f"DEBUG: {output}")
@@ -143,12 +146,12 @@ def switch_defaults(serial_info: str, debug: bool = True):
         if debug:
             print(f"DEBUG: {output}")
 
-    ser.write(b'reset\n')
+    ser.write(format_command('reset'))
     while CONFIRMATION_PROMPT not in output:
         output = ser.readline()
         if debug:
             print(f"DEBUG: {output}")
-    ser.write(b'y\n')
+    ser.write(format_command('y'))
     print("Successfully reset! Will continue trailing the output, but ^C at any point to exit.")
     try:
         while True:
@@ -160,33 +163,76 @@ def switch_defaults(serial_info: str, debug: bool = True):
         exit()
 
 def router_defaults(serial_info):
+    SHELL_PROMPT = "router"
+    ROMMON_PROMPT = "rommon"
+    ERASE_PROMPT = "[confirm]"
+    RECOVERY_REGISTER = "0x2142"
+    NORMAL_REGISTER = "0x2102"
+    SAVE_PROMPT = "[yes/no]: "
+
     print("Trigger password recovery by following these steps: ")
     print("1. Turn off the router")
     print("2. After waiting for the lights to shut off, turn the router back on")
     print("3. Press enter here once this has been completed")
     input()
 
+    # In the startup sequence, we don't need to wait for an extremely long time
     ser = serial.Serial(serial_info)
     ser.timeout = 1
 
     print("Sending ^C until we enter ROMMON")
     output = b''
-    while not output.decode().lower().startswith("rommon"):
+    while not output.decode().lower().startswith(ROMMON_PROMPT):
         ser.write(b"\x03")
         output = ser.readline()
-        print(output)
+        print(f"DEBUG: {output}")
 
     print("We've entered ROMMON, setting the register to 0x2142.")
-    ser.write(b"confreg 0x2142\n")
-    output = ser.readline()
-    print(output)
-    output = ser.readline()
-    print(output)
-    ser.write(b"reset")
-
-    output = b''
-    while not output.decode().lower().startswith("would"):
+    commands = ['confreg 0x2142', 'reset']
+    for cmd in commands:
+        ser.write(format_command(cmd))
         output = ser.readline()
+        print(f"DEBUG: {output}")
+        output = ser.readline()
+        print(f"DEBUG: {output}")
+        # Sometimes it will print out some flavor text, we just wanna ignore that until we get to the prompt again
+        while not output.decode().lower().startswith(ROMMON_PROMPT):
+            output = ser.readline()
+            print(f"DEBUG: {output}")
+    while output.decode().lower().startswith("rommon"):
+        ser.write(format_command())
+        print(f"DEBUG: {output}")
+
+    # Increase the timeout period as it can take a while for it to start up
+    ser.timeout = 15
+
+    # Wait until we're at our prompt
+    output = ser.readline()
+    while not output.decode().lower().startswith(SHELL_PROMPT):
+        if output == b'':
+            ser.write(b'\r\n')
+
+    # We can safely assume we're at the prompt, so now let's begin running our commands
+    commands = ['enable', 'conf t', 'conf-register 0x2102', 'end']
+    for cmd in commands:
+        ser.write(format_command(cmd))
+        output = ser.readline()
+        print(f"DEBUG: {output}")
+        output = ser.readline()
+        print(f"DEBUG: {output}")
+        # Sometimes it will print out some flavor text, we just wanna ignore that until we get to the prompt again
+        while not output.decode().lower().startswith(SHELL_PROMPT):
+            output = ser.readline()
+            print(f"DEBUG: {output}")
+
+    # Now save the reset configuration
+    ser.write(format_command('erase nvram:'))
+    output = ser.readline()
+    while not output.decode().lower().endswith(ERASE_PROMPT):
+        print(f"DEBUG: {output}")
+        output = ser.readline()
+    print(f"DEBUG: {output}")
+    ser.write(format_command())
 
 def log_inputs(serial_info):
     inputs = []
@@ -220,7 +266,9 @@ def log_inputs(serial_info):
             consecutive_blank_line_count = 0
         if line.startswith(b'Image validated'):
             blank_line_threshold = 15
-        if 'rommon' in line.decode().lower() or 'router' in line.decode().lower() or consecutive_blank_line_count >= blank_line_threshold:
+        if ('rommon' in line.decode().lower() or 'router' in line.decode().lower()
+                or consecutive_blank_line_count >= blank_line_threshold
+                or 'System configuration has been modified. Save? [yes/no]: '.lower() in line.decode().lower()):
             user_input = input('> ') + '\n'
             consecutive_blank_line_count = 0
             print(user_input)
