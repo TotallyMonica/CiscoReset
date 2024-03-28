@@ -232,7 +232,7 @@ def router_defaults(serial_info, debug: bool = False):
         # Sometimes it will print out some flavor text, we just wanna ignore that until we get to the prompt again
         if not cmd == commands[-1]:
             wait_until_prompt(ser, f"{ROMMON_PROMPT} {iter}", debug)
-    while output.decode().lower().startswith("rommon"):
+    while output.decode().lower().startswith(ROMMON_PROMPT):
         ser.write(format_command())
         if debug:
             print(f"DEBUG: {output}")
