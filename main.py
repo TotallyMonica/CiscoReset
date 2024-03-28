@@ -165,7 +165,7 @@ def switch_defaults(serial_info: str, debug: bool = True):
 def router_defaults(serial_info):
     SHELL_PROMPT = "router"
     ROMMON_PROMPT = "rommon"
-    ERASE_PROMPT = "[confirm]"
+    CONFIRMATION_PROMPT = "[confirm]"
     RECOVERY_REGISTER = "0x2142"
     NORMAL_REGISTER = "0x2102"
     SAVE_PROMPT = "[yes/no]: "
@@ -213,6 +213,7 @@ def router_defaults(serial_info):
             ser.write(b'\r\n')
 
     # We can safely assume we're at the prompt, so now let's begin running our commands
+    ser.timeout = 1
     commands = ['enable', 'conf t', 'conf-register 0x2102', 'end']
     for cmd in commands:
         ser.write(format_command(cmd))
@@ -228,11 +229,16 @@ def router_defaults(serial_info):
     # Now save the reset configuration
     ser.write(format_command('erase nvram:'))
     output = ser.readline()
-    while not output.decode().lower().endswith(ERASE_PROMPT):
+    while not output.decode().lower().endswith(CONFIRMATION_PROMPT):
         print(f"DEBUG: {output}")
         output = ser.readline()
     print(f"DEBUG: {output}")
     ser.write(format_command())
+    output = ser.readline()
+    print(f"DEBUG: {output}")
+    output = ser.readline()
+    print(f"DEBUG: {output}")
+
 
 def log_inputs(serial_info):
     inputs = []
@@ -284,8 +290,8 @@ def log_inputs(serial_info):
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     settings = setup_serial()
-    # print(router_defaults(settings))
+    print(router_defaults(settings))
     # print(switch_defaults(settings))
-    print(json.dumps(log_inputs(settings)))
+    # print(json.dumps(log_inputs(settings)))
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
