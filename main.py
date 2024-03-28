@@ -13,7 +13,7 @@ def dedup(original_list):
             deduped_list.append(val)
     return deduped_list
 
-def parse_files_to_delete(output: list[str], debug: bool = True):
+def parse_files_to_delete(output: list[str], debug: bool = False):
     common_prefixes = ["private-config", "config", "vlan"]
     files_to_delete = []
     for line in output:
@@ -67,7 +67,7 @@ def setup_serial():
 
     return dev
 
-def switch_defaults(serial_info: str, debug: bool = True):
+def switch_defaults(serial_info: str, debug: bool = False):
     PASSWORD_RECOVERY_ENABLED = b"The system has been interrupted"
     PASSWORD_RECOVERY_DISABLED = b"The password-recovery mechanism"
     CONFIRMATION_PROMPT = b'(y/n)?'
@@ -162,7 +162,7 @@ def switch_defaults(serial_info: str, debug: bool = True):
         ser.close()
         exit()
 
-def router_defaults(serial_info):
+def router_defaults(serial_info, debug: bool = False):
     SHELL_PROMPT = "router"
     ROMMON_PROMPT = "rommon"
     CONFIRMATION_PROMPT = "[confirm]"
@@ -180,64 +180,120 @@ def router_defaults(serial_info):
     ser = serial.Serial(serial_info)
     ser.timeout = 1
 
+    if debug:
+        print('='*30)
     print("Sending ^C until we enter ROMMON")
+    if debug:
+        print('='*30)
     output = b''
     while not output.decode().lower().startswith(ROMMON_PROMPT):
         ser.write(b"\x03")
         output = ser.readline()
-        print(f"DEBUG: {output}")
+        if debug:
+            print(f"DEBUG: {output}")
 
+    if debug:
+        print('='*30)
     print("We've entered ROMMON, setting the register to 0x2142.")
-    commands = ['confreg 0x2142', 'reset']
+    if debug:
+        print('='*30)
+    commands = [f'confreg {RECOVERY_REGISTER}', 'reset']
+    iter = 1
     for cmd in commands:
         ser.write(format_command(cmd))
         output = ser.readline()
-        print(f"DEBUG: {output}")
-        output = ser.readline()
-        print(f"DEBUG: {output}")
-        # Sometimes it will print out some flavor text, we just wanna ignore that until we get to the prompt again
-        while not output.decode().lower().startswith(ROMMON_PROMPT):
-            output = ser.readline()
+        if debug:
             print(f"DEBUG: {output}")
+        output = ser.readline()
+        if debug:
+            print(f"DEBUG: {output}")
+        iter += 1
+        # Sometimes it will print out some flavor text, we just wanna ignore that until we get to the prompt again
+        while not output.decode().lower().startswith(f"{ROMMON_PROMPT} {iter}") and not cmd == commands[-1]:
+            output = ser.readline()
+            if debug:
+                print(f"DEBUG: {output}")
     while output.decode().lower().startswith("rommon"):
         ser.write(format_command())
-        print(f"DEBUG: {output}")
+        if debug:
+            print(f"DEBUG: {output}")
 
     # Increase the timeout period as it can take a while for it to start up
     ser.timeout = 15
 
     # Wait until we're at our prompt
+    if debug:
+        print('='*30)
+    print("We've finished with ROMMON, now booting up the router.")
+    if debug:
+        print('='*30)
     output = ser.readline()
     while not output.decode().lower().startswith(SHELL_PROMPT):
+        if debug:
+            print(f"DEBUG: {output}")
+        output = ser.readline()
         if output == b'':
             ser.write(b'\r\n')
 
     # We can safely assume we're at the prompt, so now let's begin running our commands
+    if debug:
+        print('='*30)
+    print("Setting the registers back to regular")
+    if debug:
+        print('='*30)
     ser.timeout = 1
-    commands = ['enable', 'conf t', 'conf-register 0x2102', 'end']
+    commands = ['enable', 'conf t', f'conf-register {NORMAL_REGISTER}', 'end']
     for cmd in commands:
         ser.write(format_command(cmd))
         output = ser.readline()
-        print(f"DEBUG: {output}")
+        if debug:
+            print(f"DEBUG: {output}")
         output = ser.readline()
-        print(f"DEBUG: {output}")
+        if debug:
+            print(f"DEBUG: {output}")
         # Sometimes it will print out some flavor text, we just wanna ignore that until we get to the prompt again
         while not output.decode().lower().startswith(SHELL_PROMPT):
             output = ser.readline()
-            print(f"DEBUG: {output}")
+            if debug:
+                print(f"DEBUG: {output}")
 
     # Now save the reset configuration
+    if debug:
+        print('='*30)
+    print("Resetting the configuration")
+    if debug:
+        print('='*30)
     ser.write(format_command('erase nvram:'))
     output = ser.readline()
     while not output.decode().lower().endswith(CONFIRMATION_PROMPT):
-        print(f"DEBUG: {output}")
+        if debug:
+            print(f"DEBUG: {output}")
         output = ser.readline()
-    print(f"DEBUG: {output}")
-    ser.write(format_command())
+    if debug:
+        print(f"DEBUG: {output}")
+    ser.write(format_command("confirm"))
     output = ser.readline()
-    print(f"DEBUG: {output}")
+    if debug:
+        print(f"DEBUG: {output}")
     output = ser.readline()
-    print(f"DEBUG: {output}")
+    if debug:
+        print(f"DEBUG: {output}")
+
+    return
+
+    if debug:
+        print('='*30)
+    print("Reloading the router")
+    if debug:
+        print('=' * 30)
+
+    ser.write(format_command("reload"))
+    output = ser.readline()
+    if debug:
+        print(f"DEBUG: {output}")
+    output = ser.readline()
+    if debug:
+        print(f"DEBUG: {output}")
 
 
 def log_inputs(serial_info):
@@ -290,7 +346,7 @@ def log_inputs(serial_info):
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     settings = setup_serial()
-    print(router_defaults(settings))
+    print(router_defaults(settings, debug=True))
     # print(switch_defaults(settings))
     # print(json.dumps(log_inputs(settings)))
 
