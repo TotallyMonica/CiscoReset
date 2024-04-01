@@ -140,27 +140,33 @@ def switch_defaults(serial_info: str, debug: bool = False):
         for line in listing:
             print(f"DEBUG: {line}")
     files_to_delete = parse_files_to_delete(listing, debug)
-    print("Deleting files")
-    for file in files_to_delete:
-        print(f"Deleting {file}")
-        ser.write(format_command(f'del flash:{file}'))
-        output = ser.readline()
-        while CONFIRMATION_PROMPT not in output:
+    if len(files_to_delete) == 0:
+        print("Switch has been erased already.")
+        ser.write(format_command())
+        ser.timeout = 1
+    else:
+        print("Deleting files")
+        for file in files_to_delete:
+            print(f"Deleting {file}")
+            ser.write(format_command(f'del flash:{file}'))
+            output = ser.readline()
+            while CONFIRMATION_PROMPT not in output:
+                if debug:
+                    print(f"DEBUG: {output}")
+                output = ser.readline()
+            if debug:
+                print(f"DEBUG: {output}")
+                print(f"Confirming deletion")
+            ser.write(format_command('y'))
+            output = ser.readline()
             if debug:
                 print(f"DEBUG: {output}")
             output = ser.readline()
-        if debug:
-            print(f"DEBUG: {output}")
-            print(f"Confirming deletion")
-        ser.write(format_command('y'))
-        output = ser.readline()
-        if debug:
-            print(f"DEBUG: {output}")
-        output = ser.readline()
-        if debug:
-            print(f"DEBUG: {output}")
+            if debug:
+                print(f"DEBUG: {output}")
+        print("Switch has been reset.")
 
-    print("Files deleted, resetting the switch")
+    print("Resetting the switch")
     while RECOVERY_PROMPT not in output:
         output = ser.readline()
         if debug:
@@ -384,8 +390,8 @@ def log_inputs(serial_info):
 
 def main(args: list = sys.argv):
     settings = setup_serial()
-    print(router_defaults(settings, debug=True))
-    # print(switch_defaults(settings))
+    # print(router_defaults(settings, debug=True))
+    print(switch_defaults(settings, debug=True))
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
