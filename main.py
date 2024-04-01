@@ -310,22 +310,30 @@ def router_defaults(serial_info, debug: bool = False):
     if debug:
         print('=' * 30)
 
+    read_count = 0
+
     ser.write(format_command("reload"))
-    output = ser.readline()
-    if debug:
-        print(f"DEBUG: {output}")
-    output = ser.readline()
-    if debug:
-        print(f"DEBUG: {output}")
-    output = ser.readline()
-    if debug:
-        print(f"DEBUG: {output}")
-    output = ser.readline()
-    if debug:
-        print(f"DEBUG: {output}")
-    output = ser.readline()
-    if debug:
-        print(f"DEBUG: {output}")
+    while SAVE_PROMPT not in output.decode().lower():
+        output = ser.readline()
+        read_count += 1
+        if debug:
+            print(output)
+    ser.write(format_command("yes"))
+    while CONFIRMATION_PROMPT not in output.decode().lower():
+        output = ser.readline()
+        read_count += 1
+        if debug:
+            print(output)
+    ser.write(format_command())
+    print("Successfully reset! Will continue trailing the output, but ^C at any point to exit.")
+    try:
+        while True:
+            if debug:
+                print(f"DEBUG: {ser.readline()}")
+    except KeyboardInterrupt:
+        print("Keyboard interrupt found, cleaning up")
+        ser.close()
+        exit()
 
 def log_inputs(serial_info):
     inputs = []
@@ -377,7 +385,7 @@ def log_inputs(serial_info):
 def main(args: list = sys.argv):
     settings = setup_serial()
     print(router_defaults(settings, debug=True))
-    print(switch_defaults(settings))
+    # print(switch_defaults(settings))
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
