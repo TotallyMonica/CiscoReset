@@ -207,9 +207,16 @@ def router_defaults(serial_info, debug: bool = False):
     if debug:
         print('='*30)
     output = b''
-    wait_until_prompt(ser, ROMMON_PROMPT, debug)
-    ser.write(b"\x03")
     output = ser.readline()
+    if debug:
+        while not output.decode().lower().strip().startswith(ROMMON_PROMPT.lower().strip()):
+            print(f"DEBUG: {output}")
+            ser.write(b"\x03")
+            output = ser.readline()
+    else:
+        while not output.decode().lower().strip().startswith(ROMMON_PROMPT.lower().strip()):
+            ser.write(b"\x03")
+            output = ser.readline()
     if debug:
         print(f"DEBUG: {output}")
 
@@ -297,8 +304,6 @@ def router_defaults(serial_info, debug: bool = False):
     if debug:
         print(f"DEBUG: {output}")
 
-    return
-
     if debug:
         print('='*30)
     print("Reloading the router")
@@ -312,7 +317,15 @@ def router_defaults(serial_info, debug: bool = False):
     output = ser.readline()
     if debug:
         print(f"DEBUG: {output}")
-
+    output = ser.readline()
+    if debug:
+        print(f"DEBUG: {output}")
+    output = ser.readline()
+    if debug:
+        print(f"DEBUG: {output}")
+    output = ser.readline()
+    if debug:
+        print(f"DEBUG: {output}")
 
 def log_inputs(serial_info):
     inputs = []
