@@ -25,7 +25,7 @@ def dedup(original_list):
             deduped_list.append(val)
     return deduped_list
 
-def parse_files_to_delete(output: list[str], debug: bool = False):
+def parse_files_to_delete(output: list, debug: bool = False):
     common_prefixes = ["private-config", "config", "vlan"]
     files_to_delete = []
     for line in output:
