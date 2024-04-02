@@ -390,12 +390,17 @@ def log_inputs(serial_info):
 
 def main(args: list = sys.argv):
     settings = setup_serial()
-    # print(router_defaults(settings, debug=True))
-    print(switch_defaults(settings, debug=True))
+    debug = '--debug' in args
+    if '--router' in args or '--switch' in args:
+        if '--router' in args:
+            router_defaults(settings, debug=debug)
+        if '--switch' in args:
+            switch_defaults(settings, debug=debug)
+    else:
+        print("Error: You must provide at least --router or --switch.")
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     main(sys.argv)
-    # print(json.dumps(log_inputs(settings)))
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
