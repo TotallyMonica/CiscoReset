@@ -104,7 +104,6 @@ def switch_defaults(serial_info: str, debug: bool = False):
     for i in range(len(STEPS)):
         print(f"{i+1}. {STEPS[i]}")
 
-
     output = ser.readline()
     while b'\rXmodem file system is available.\n' not in output:
         if debug:
@@ -114,22 +113,10 @@ def switch_defaults(serial_info: str, debug: bool = False):
         print(f"DEBUG: {output}")
     print("Release the mode button now")
 
-    output = ser.readline()
-    while RECOVERY_PROMPT not in output:
-        if debug:
-            print(f"DEBUG: {output}")
-        output = ser.readline()
-    if debug:
-        print(f"DEBUG: {output}")
+    wait_until_prompt(ser, RECOVERY_PROMPT, debug)
     print("Entered recovery console, initializing flash.")
     ser.write(format_command('flash_init\n'))
-    output = ser.readline()
-    while RECOVERY_PROMPT not in output:
-        if debug:
-            print(f"DEBUG: {output}")
-        output = ser.readline()
-    if debug:
-        print(f"DEBUG: {output}")
+    wait_until_prompt(ser, RECOVERY_PROMPT, debug)
     print("Flash has been initialized, now listing directory")
     ser.write(format_command('dir flash:\n'))
     output = ser.readline()
@@ -150,12 +137,8 @@ def switch_defaults(serial_info: str, debug: bool = False):
             print(f"Deleting {file}")
             ser.write(format_command(f'del flash:{file}'))
             output = ser.readline()
-            while CONFIRMATION_PROMPT not in output:
-                if debug:
-                    print(f"DEBUG: {output}")
-                output = ser.readline()
+            wait_until_prompt(ser, CONFIRMATION_PROMPT, debug)
             if debug:
-                print(f"DEBUG: {output}")
                 print(f"Confirming deletion")
             ser.write(format_command('y'))
             output = ser.readline()
@@ -167,17 +150,11 @@ def switch_defaults(serial_info: str, debug: bool = False):
         print("Switch has been reset.")
 
     print("Resetting the switch")
-    while RECOVERY_PROMPT not in output:
-        output = ser.readline()
-        if debug:
-            print(f"DEBUG: {output}")
-
+    wait_until_prompt(ser, RECOVERY_PROMPT, debug)
     ser.write(format_command('reset'))
-    while CONFIRMATION_PROMPT not in output:
-        output = ser.readline()
-        if debug:
-            print(f"DEBUG: {output}")
+    wait_until_prompt(ser, RECOVERY_PROMPT, debug)
     ser.write(format_command('y'))
+
     print("Successfully reset! Will continue trailing the output, but ^C at any point to exit.")
     try:
         while True:
@@ -186,7 +163,7 @@ def switch_defaults(serial_info: str, debug: bool = False):
     except KeyboardInterrupt:
         print("Keyboard interrupt found, cleaning up")
         ser.close()
-        exit()
+        return
 
 def router_defaults(serial_info, debug: bool = False):
     SHELL_PROMPT = "router"
@@ -205,7 +182,6 @@ def router_defaults(serial_info, debug: bool = False):
     print("2. After waiting for the lights to shut off, turn the router back on")
     print("3. Press enter here once this has been completed")
     input()
-
 
     if debug:
         print('='*30)
@@ -284,10 +260,7 @@ def router_defaults(serial_info, debug: bool = False):
         if debug:
             print(f"DEBUG: {output}")
         # Sometimes it will print out some flavor text, we just wanna ignore that until we get to the prompt again
-        while not output.decode().lower().startswith(SHELL_PROMPT):
-            output = ser.readline()
-            if debug:
-                print(f"DEBUG: {output}")
+        wait_until_prompt(ser, SHELL_PROMPT, debug)
 
     # Now save the reset configuration
     if debug:
@@ -316,20 +289,10 @@ def router_defaults(serial_info, debug: bool = False):
     if debug:
         print('=' * 30)
 
-    read_count = 0
-
     ser.write(format_command("reload"))
-    while SAVE_PROMPT not in output.decode().lower():
-        output = ser.readline()
-        read_count += 1
-        if debug:
-            print(output)
+    wait_until_prompt(ser, SAVE_PROMPT, debug)
     ser.write(format_command("yes"))
-    while CONFIRMATION_PROMPT not in output.decode().lower():
-        output = ser.readline()
-        read_count += 1
-        if debug:
-            print(output)
+    wait_until_prompt(ser, SAVE_PROMPT, debug)
     ser.write(format_command())
     print("Successfully reset! Will continue trailing the output, but ^C at any point to exit.")
     try:
@@ -338,8 +301,7 @@ def router_defaults(serial_info, debug: bool = False):
                 print(f"DEBUG: {ser.readline()}")
     except KeyboardInterrupt:
         print("Keyboard interrupt found, cleaning up")
-        ser.close()
-        exit()
+        return
 
 def log_inputs(serial_info):
     inputs = []
