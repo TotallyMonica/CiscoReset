@@ -18,6 +18,16 @@ def wait_until_prompt(dev: serial.Serial, prompt: str, debug: bool = False) -> b
 
     return output
 
+def bulk_read_lines(dev: serial.Serial, line_count: int = 2, debug: bool = False) -> bytes:
+    if debug:
+        for i in range(line_count):
+            output = dev.readline()
+            print(f"DEBUG: {output}")
+    else:
+        for i in range(line_count):
+            output = dev.readline()
+    return output
+
 def dedup(original_list):
     deduped_list = []
     for val in original_list:
@@ -142,11 +152,7 @@ def switch_defaults(serial_info: str, debug: bool = False):
                 print(f"Confirming deletion")
             ser.write(format_command('y'))
             output = ser.readline()
-            if debug:
-                print(f"DEBUG: {output}")
-            output = ser.readline()
-            if debug:
-                print(f"DEBUG: {output}")
+            bulk_read_lines(ser, debug=debug)
         print("Switch has been reset.")
 
     print("Resetting the switch")
@@ -253,12 +259,7 @@ def router_defaults(serial_info, debug: bool = False):
     commands = ['enable', 'conf t', f'config-register {NORMAL_REGISTER}', 'end']
     for cmd in commands:
         ser.write(format_command(cmd))
-        output = ser.readline()
-        if debug:
-            print(f"DEBUG: {output}")
-        output = ser.readline()
-        if debug:
-            print(f"DEBUG: {output}")
+        bulk_read_lines(ser, debug=debug)
         # Sometimes it will print out some flavor text, we just wanna ignore that until we get to the prompt again
         wait_until_prompt(ser, SHELL_PROMPT, debug)
 
@@ -269,19 +270,9 @@ def router_defaults(serial_info, debug: bool = False):
     if debug:
         print('='*30)
     ser.write(format_command('erase nvram:'))
-    output = ser.readline()
-    if debug:
-        print(f"DEBUG: {output}")
-    output = ser.readline()
-    if debug:
-        print(f"DEBUG: {output}")
+    bulk_read_lines(ser, debug=debug)
     ser.write(format_command())
-    output = ser.readline()
-    if debug:
-        print(f"DEBUG: {output}")
-    output = ser.readline()
-    if debug:
-        print(f"DEBUG: {output}")
+    bulk_read_lines(ser, debug=debug)
 
     if debug:
         print('='*30)
